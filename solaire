@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+#
+# Program: solaire
+# Description: 
+#
+# Author: Maxime Daraiche <maxiscoding@gmail.com>
+#
+#/ Usage: solaire [OPTIONS]... [ARGUMENTS]...
+#/
+#/ 
+#/ OPTIONS
+#/   -h, --help
+#/                Print this help message
+#/
+#/ EXAMPLES
+#/
+
+# Prerequisites:
+#   - Having 'feh' && 'imagemagick' installed on your machine
+
+set -eou pipefail
+#set -x
+IFS=$'\n\t'
+
+CACHEDIR="$HOME/.cache/solaire"
+REQUIRED_CMDS=(feh convert)
+
+# Boy, what a very useful wizardry, jolly good !
+usage() { 
+  grep '^#/' "$0" | cut -c4- && exit 0 
+}
+
+die() {
+  local err_msg="$1"
+  printf "[Error] %s\n" "$err_msg" && exit 1
+}
+
+check_requirements() {
+  local ret=0
+
+  for cmd in ${REQUIRED_CMDS[@]}; do
+
+    if ! command -v "$cmd" > /dev/null; then
+      printf "[INFO] The '%s' package is not installed on this system..\n" "$cmd"
+
+      if [[ "$cmd" == "${REQUIRED_CMDS[1]}" ]]; then
+	printf "[INFO] Please install the 'imagemagick' package..\n"
+      fi
+
+      ret=1
+    fi
+
+  done
+  
+  return "$ret"
+}
+
+parse_arguments() {
+  for i in "$@"; do
+    printf "Parsing argument: %s\n" "$i"
+    case "$i" in
+      --help)
+	usage
+	;;
+      --delay)
+        FRAME_DELAY="$3"
+    esac
+  done
+}
+
+make_cachedir() {
+  mkdir --parent "$CACHEDIR" 
+
+  if [[ "$?" -ne 0 ]]; then
+    die "[Error] Could not create cache directory.."
+  fi
+}
+
+split_gif_img() {
+  :
+}
+
+is_valid_img() {
+  :
+}
+
+main() {
+
+  # Abort and print the usage (help) if no arguments were passed
+  [[ "$#" -eq 0 ]] && usage
+
+  # Check if the required packages are installed
+  check_requirements 
+    
+  # If requirements are not satisfied, abort the program
+  [[ "$?" -ne 0 ]] && exit 1
+
+  local gif_img="$1"
+
+  local frame_basename=$(basename "$gif_img" | cut -d '.' -f1)
+  
+  parse_arguments "$@"
+
+  # TODO Verify if that image's frames were already cached and load that instead..
+  convert -coalesce "$gif_img" "$CACHEDIR/$frame_basename.png"
+
+  local frame_count=$(ls "$CACHEDIR" | wc -l)
+  local idx=0
+
+  while true; do
+
+    feh --bg-scale "$CACHEDIR/$frame_basename-$idx.png"
+    sleep "${FRAME_DELAY:-0.5}"
+
+    if [[ "$idx" -eq $((frame_count - 1)) ]]; then
+      idx=0 
+    else
+      idx=$((idx + 1))
+    fi
+
+  done
+}
+
+main "$@"
