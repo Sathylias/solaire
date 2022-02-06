@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2155
+# set -x
+# set -eou pipefail
 #
 # Program: solaire
-# Description: 
+# Description: Show off an animated wallpaper on your desktop & become grossly incandescent
 #
 # Author: Maxime Daraiche <maxiscoding@gmail.com>
 #
@@ -12,76 +15,67 @@
 #/   -h, --help
 #/                Print this help message
 #/
+#/   -d, --delay
+#/                Specify a delay in seconds, can be a float value (ex. 0.05)
+#/                Default value if not specified is 0.2s
+#/   
+#/   
 #/ EXAMPLES
-#/
-
-# Prerequisites:
+#/ solaire ~/Pictures/solaire.gif --delay 0.05
+#/   
+# PREREQUISITES:
 #   - Having 'feh' && 'imagemagick' installed on your machine
 
-set -eou pipefail
-#set -x
-IFS=$'\n\t'
-
-CACHEDIR="$HOME/.cache/solaire"
-REQUIRED_CMDS=(feh convert)
 
 # Boy, what a very useful wizardry, jolly good !
-usage() { 
-  grep '^#/' "$0" | cut -c4- && exit 0 
-}
-
-die() {
-  local err_msg="$1"
-  printf "[Error] %s\n" "$err_msg" && exit 1
+usage() {
+  grep '^#/' "$0" | cut -c4- && exit 0
 }
 
 check_requirements() {
+  REQUIRED_CMDS=(feh convert)
   local ret=0
 
-  for cmd in ${REQUIRED_CMDS[@]}; do
-
+  for cmd in "${REQUIRED_CMDS[@]}"; do
     if ! command -v "$cmd" > /dev/null; then
-      printf "[INFO] The '%s' package is not installed on this system..\n" "$cmd"
-
-      if [[ "$cmd" == "${REQUIRED_CMDS[1]}" ]]; then
-	printf "[INFO] Please install the 'imagemagick' package..\n"
-      fi
-
+      printf "[INFO] The '%s' command isn't available on your system\n" "$cmd"
       ret=1
     fi
-
   done
   
   return "$ret"
 }
 
 parse_arguments() {
-  for i in "$@"; do
-    printf "Parsing argument: %s\n" "$i"
-    case "$i" in
-      --help)
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --help|-h)
 	usage
 	;;
-      --delay)
-        FRAME_DELAY="$3"
+      --delay|-d)
+	printf "Setting delay at %s seconds\n" "$2"
+        FRAME_DELAY="$2"
+	shift 
+	shift
+	;;
+      --no-solaire-bg|-n)
+	# TODO: Just like feh, output the last command used to '$HOME/.solairebg'
+	# NO_SOLAIRE_BG=true
+	# shift
+	;;
+      *)
+	# TODO: Argument should be an image file, verify if it's valid
+	GIF_IMG="$1"
+	shift
+	;;
     esac
   done
 }
 
 make_cachedir() {
-  mkdir --parent "$CACHEDIR" 
-
-  if [[ "$?" -ne 0 ]]; then
-    die "[Error] Could not create cache directory.."
+  if [[ "$(mkdir --parent "$1" > /dev/null)" -ne 0 ]]; then
+    printf "[Error] Could not create cache directory..\n" && exit 1
   fi
-}
-
-split_gif_img() {
-  :
-}
-
-is_valid_img() {
-  :
 }
 
 main() {
@@ -89,28 +83,35 @@ main() {
   # Abort and print the usage (help) if no arguments were passed
   [[ "$#" -eq 0 ]] && usage
 
-  # Check if the required packages are installed
+  # Check if the required commands are available
   check_requirements 
     
   # If requirements are not satisfied, abort the program
+  # shellcheck disable=SC2181
   [[ "$?" -ne 0 ]] && exit 1
 
-  local gif_img="$1"
-
-  local frame_basename=$(basename "$gif_img" | cut -d '.' -f1)
-  
   parse_arguments "$@"
 
-  # TODO Verify if that image's frames were already cached and load that instead..
-  convert -coalesce "$gif_img" "$CACHEDIR/$frame_basename.png"
+  local frame_basename=$(basename "$GIF_IMG" | cut -d '.' -f1)
+  local cachedir="$HOME/.cache/solaire/$frame_basename"
 
-  local frame_count=$(ls "$CACHEDIR" | wc -l)
+  # Verify if cache directory exist, create it & convert the image if otherwise 
+  if ! [[ -d "$cachedir" ]]; then
+    make_cachedir "$cachedir"
+    convert -coalesce "$GIF_IMG" "$cachedir/$frame_basename.png"
+  fi
+    
+  local frame_count=$(find "$cachedir" -mindepth 1 -maxdepth 1 | wc -l)
+  #local frame_count=$(ls "$cachedir" | wc -l)
+
+  printf "Number of frames: %d\n" "$frame_count" 
+  
   local idx=0
-
+  
   while true; do
 
-    feh --bg-scale "$CACHEDIR/$frame_basename-$idx.png"
-    sleep "${FRAME_DELAY:-0.5}"
+    feh --no-fehbg --bg-scale "$cachedir/$frame_basename-$idx.png"
+    sleep "${FRAME_DELAY:-0.2}"
 
     if [[ "$idx" -eq $((frame_count - 1)) ]]; then
       idx=0 
