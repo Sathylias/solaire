@@ -63,6 +63,13 @@ parse_arguments() {
 	# NO_SOLAIRE_BG=true
 	# shift
 	;;
+      --kill|-k)
+	# Get the running instance pid, excluding feh calls & this script
+	# TODO: This seems hacky, investigate a better way
+	process=$(pgrep -f solaire -u $(whoami) | grep -Ev "^$$|feh|kill" | awk 'FNR==1 {print $1}')
+	kill "$process"
+	exit 0
+	;;
       *)
 	# TODO: Argument should be an image file, verify if it's valid
 	GIF_IMG="$1"
